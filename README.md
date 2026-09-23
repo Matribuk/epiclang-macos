@@ -22,6 +22,11 @@ relancer plus tard est sans danger.
 aucun droit administrateur.** Homebrew n'est sollicité que s'il faut installer
 Docker. Ne lance pas le script avec `sudo` : il refuse, et Homebrew aussi.
 
+Xcode et les Command Line Tools ne sont **pas** nécessaires : rien n'est compilé
+sur ton Mac, tout se passe dans le conteneur. Seul le `git clone` a besoin de
+`git` ; sur un Mac neuf, macOS propose de l'installer au premier appel. Pour
+l'éviter, télécharge le dépôt en ZIP depuis GitHub.
+
 ```
 ==> Verification du systeme
     OK macOS 26.5.2 sur arm64
