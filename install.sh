@@ -19,35 +19,38 @@ die()  { printf '\n\033[1;31mEchec :\033[0m %s\n' "$*" >&2; exit 1; }
 require_macos() {
     step "Verification du systeme"
     [ "$(uname -s)" = "Darwin" ] || die "Ce script est prevu pour macOS."
+    if [ "$(id -u)" -eq 0 ]; then
+        die "Ne lance pas ce script avec sudo : il installe dans ton dossier
+    personnel, et Homebrew refuse de s'installer en root.
+    Relance simplement : ./install.sh"
+    fi
     ok "macOS $(sw_vers -productVersion) sur $(uname -m)"
 }
 
-# --- 2. Homebrew --------------------------------------------------------
-ensure_homebrew() {
-    step "Homebrew"
-    if ! command -v brew >/dev/null 2>&1; then
-        info "Installation de Homebrew (mot de passe administrateur demande)..."
-        NONINTERACTIVE=1 /bin/bash -c \
-            "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+# Homebrew et Docker Desktop exigent un compte administrateur.
+# Le reste du script n'en a pas besoin.
+is_admin() {
+    if dseditgroup -o checkmember -m "$(id -un)" admin 2>/dev/null | grep -q '^yes'; then
+        return 0
     fi
-    for brew_bin in /opt/homebrew/bin/brew /usr/local/bin/brew; do
-        [ -x "$brew_bin" ] && eval "$("$brew_bin" shellenv)" && break
-    done
-    command -v brew >/dev/null 2>&1 || die "Homebrew reste introuvable apres installation."
-    ok "Homebrew $(brew --version | head -n1 | awk '{print $2}')"
+    id -Gn 2>/dev/null | tr ' ' '\n' | grep -qx admin
 }
 
-# --- 3. Docker ----------------------------------------------------------
+# --- 2. Docker ----------------------------------------------------------
+# Homebrew n'est sollicite que s'il faut reellement installer Docker.
+# Sur une machine ou Docker Desktop est deja present, l'installation
+# complete se fait sans aucun droit administrateur.
 ensure_docker() {
     step "Docker"
+
     if docker info >/dev/null 2>&1; then
         ok "le demon Docker repond deja"
+        rosetta_hint
         return
     fi
 
-    if ! command -v docker >/dev/null 2>&1 && [ ! -d /Applications/Docker.app ]; then
-        info "Installation de Docker Desktop via Homebrew (quelques minutes)..."
-        brew install --cask docker
+    if [ ! -d /Applications/Docker.app ] && ! command -v docker >/dev/null 2>&1; then
+        install_docker
     fi
 
     if [ -d /Applications/Docker.app ]; then
@@ -62,13 +65,73 @@ ensure_docker() {
         sleep 1
     done
     docker info >/dev/null 2>&1 \
-        || die "Docker ne repond pas. Ouvre Docker Desktop, accepte les conditions, puis relance ./install.sh"
+        || die "Docker ne repond pas. Ouvre Docker Desktop, accepte les conditions,
+    puis relance ./install.sh"
     ok "le demon Docker repond"
+    rosetta_hint
+}
 
-    if [ "$(uname -m)" = "arm64" ]; then
-        info "Conseil : Docker Desktop > Settings > General > Use Rosetta"
-        info "accelere nettement la compilation sur puce Apple."
+rosetta_hint() {
+    [ "$(uname -m)" = "arm64" ] || return 0
+    info "Conseil : Docker Desktop > Settings > General > Use Rosetta"
+    info "accelere nettement la compilation sur puce Apple."
+}
+
+install_docker() {
+    info "Docker n'est pas installe sur cette machine."
+    if ! is_admin; then
+        die "installer Docker Desktop demande un compte administrateur, et
+    $(id -un) n'en est pas un.
+
+    Fais installer Docker Desktop par un administrateur :
+        https://www.docker.com/products/docker-desktop/
+    ou, s'il a Homebrew :
+        brew install --cask docker
+
+    Ensuite, demarre Docker et relance ./install.sh :
+    plus aucun droit administrateur ne sera necessaire."
     fi
+
+    ensure_homebrew
+    info "Installation de Docker Desktop via Homebrew (quelques minutes)..."
+    brew install --cask docker
+}
+
+# --- 3. Homebrew --------------------------------------------------------
+# Charge Homebrew s'il est installe mais absent du PATH, cas frequent
+# quand le shell n'a jamais ete configure.
+load_homebrew() {
+    local brew_bin
+    for brew_bin in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [ -x "$brew_bin" ]; then
+            eval "$("$brew_bin" shellenv)"
+            return
+        fi
+    done
+}
+
+ensure_homebrew() {
+    command -v brew >/dev/null 2>&1 || load_homebrew
+
+    if command -v brew >/dev/null 2>&1; then
+        ok "Homebrew $(brew --version | head -n1 | awk '{print $2}')"
+        return
+    fi
+
+    if ! is_admin; then
+        die "installer Homebrew demande un compte administrateur, et
+    $(id -un) n'en est pas un.
+    Fais installer Homebrew par un administrateur (https://brew.sh),
+    puis relance ./install.sh"
+    fi
+
+    info "Installation de Homebrew. Ton mot de passe administrateur va etre demande."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+        || die "l'installation de Homebrew a echoue. Installe-le a la main : https://brew.sh"
+
+    load_homebrew
+    command -v brew >/dev/null 2>&1 || die "Homebrew reste introuvable apres installation."
+    ok "Homebrew $(brew --version | head -n1 | awk '{print $2}')"
 }
 
 # --- 4. Image -----------------------------------------------------------
@@ -227,7 +290,6 @@ verify() {
 main() {
     NEEDS_NEW_SHELL=0
     require_macos
-    ensure_homebrew
     ensure_docker
     build_image
     install_commands

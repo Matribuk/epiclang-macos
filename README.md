@@ -14,9 +14,13 @@ cd epiclang-macos
 ./install.sh
 ```
 
-Le script installe ce qui manque et ignore ce qui est déjà là : Homebrew, Docker
-Desktop, l'image Epitech, puis les commandes. Compter 5 à 10 minutes la première
-fois. Le relancer plus tard est sans danger.
+Le script installe ce qui manque et ignore ce qui est déjà là : Docker Desktop,
+l'image Epitech, puis les commandes. Compter 5 à 10 minutes la première fois. Le
+relancer plus tard est sans danger.
+
+**Si Docker Desktop est déjà installé sur la machine, l'installation ne demande
+aucun droit administrateur.** Homebrew n'est sollicité que s'il faut installer
+Docker. Ne lance pas le script avec `sudo` : il refuse, et Homebrew aussi.
 
 ```
 ==> Verification du systeme
@@ -40,6 +44,14 @@ Termine. epiclang est pret.
 
 Si le script s'arrête en demandant d'accepter les conditions de Docker Desktop :
 ouvre l'application, accepte, puis relance `./install.sh`.
+
+### Compte sans droits administrateur
+
+Installer Docker Desktop, ou Homebrew, exige d'être administrateur de la
+machine. Si ce n'est pas ton cas, le script s'arrête avec la marche à suivre
+plutôt qu'avec une erreur de Homebrew. Demande à un administrateur d'installer
+[Docker Desktop](https://www.docker.com/products/docker-desktop/), démarre-le,
+puis relance `./install.sh` : le reste se fait sans aucun privilège.
 
 ### Ce que le script écrit sur ta machine
 
@@ -199,6 +211,8 @@ C'est aussi la plateforme sur laquelle tes projets seront corrigés.
 | --- | --- |
 | `epiclang: command not found` | Ouvre un nouveau terminal, ou relance `./install.sh` |
 | `Docker n'est pas demarre` | Lance Docker Desktop, attends qu'il soit prêt |
+| `demande un compte administrateur` | Fais installer Docker Desktop par un administrateur, puis relance |
+| `Ne lance pas ce script avec sudo` | Relance sans `sudo` : `./install.sh` |
 | `exec format error: ./prog` | Binaire Linux : utilise `epibox ./prog` |
 | `no such file or directory` sur un fichier du projet | Il est hors du dossier courant : compile depuis le dossier parent commun |
 | Aucun avertissement `[Banana]` | `EPICLANG_REBUILD=1 ./install.sh` |
