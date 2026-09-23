@@ -17,7 +17,9 @@ docker run --rm -i $tty_flag \
     "$IMAGE" "${@:-bash}"
 status=$?
 
-if [ "$status" -eq 125 ] && ! docker info >/dev/null 2>&1; then
+# Le demon injoignable renvoie 1, un conteneur qui ne demarre pas 125 :
+# on verifie donc sur tout echec, et seulement sur echec.
+if [ "$status" -ne 0 ] && ! docker info >/dev/null 2>&1; then
     echo "epibox: Docker n'est pas demarre. Ouvre Docker Desktop, puis reessaie." >&2
 fi
 exit "$status"
