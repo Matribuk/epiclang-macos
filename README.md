@@ -9,7 +9,7 @@ Ce dépôt l'installe sur macOS en une commande. Tu obtiens ensuite les commande
 ## Installation
 
 ```sh
-git clone https://github.com/<ton-org>/epiclang-macos.git
+git clone https://github.com/Matribuk/epiclang-macos.git
 cd epiclang-macos
 ./install.sh
 ```
