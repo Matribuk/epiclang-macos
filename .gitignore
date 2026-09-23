@@ -1,0 +1,5 @@
+# binaires produits par les exemples
+examples/hello
+examples/style_error
+*.o
+a.out

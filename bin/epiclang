@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# epiclang sur macOS : relaie la commande vers le conteneur Linux.
+# Le dossier courant est monte au MEME chemin dans le conteneur, pour que
+# les chemins relatifs, les -I et les messages d'erreur restent exacts.
+set -uo pipefail
+
+IMAGE="${EPICLANG_IMAGE:-epiclang:local}"
+
+docker run --rm -i \
+    --platform linux/amd64 \
+    -u "$(id -u):$(id -g)" \
+    -v "$PWD":"$PWD" -w "$PWD" \
+    "$IMAGE" "$@"
+status=$?
+
+if [ "$status" -eq 125 ] && ! docker info >/dev/null 2>&1; then
+    echo "epiclang: Docker n'est pas demarre. Ouvre Docker Desktop, puis reessaie." >&2
+fi
+exit "$status"
