@@ -84,6 +84,35 @@ build_image() {
 }
 
 # --- 5. Commandes -------------------------------------------------------
+
+# Choisit UN SEUL fichier de configuration, jamais deux : sur macOS un
+# .bash_profile source presque toujours .bashrc, ecrire dans les deux
+# dupliquerait la ligne.
+pick_rc_file() {
+    case "${SHELL:-/bin/zsh}" in
+        *zsh)
+            printf '%s\n' "$HOME/.zshrc"
+            ;;
+        *bash)
+            if [ -f "$HOME/.bash_profile" ]; then
+                printf '%s\n' "$HOME/.bash_profile"
+            elif [ -f "$HOME/.bashrc" ]; then
+                printf '%s\n' "$HOME/.bashrc"
+            else
+                printf '%s\n' "$HOME/.bash_profile"
+            fi
+            ;;
+        *)
+            printf '%s\n' "$HOME/.profile"
+            ;;
+    esac
+}
+
+manual_path_hint() {
+    info "Ajoute toi-meme cette ligne a ton fichier de configuration :"
+    info "    $PATH_LINE"
+}
+
 install_commands() {
     step "Commandes epiclang et epibox"
     mkdir -p "$INSTALL_DIR"
@@ -91,25 +120,58 @@ install_commands() {
     install -m 0755 "$REPO_DIR/bin/epibox"   "$INSTALL_DIR/epibox"
     ok "installees dans $INSTALL_DIR"
 
-    case ":$PATH:" in
+    PATH_MARKER="# epiclang-macos"
+    PATH_LINE="export PATH=\"$INSTALL_DIR:\$PATH\""
+
+    # Cas le plus frequent : rien a faire, aucun fichier n'est ouvert.
+    case ":${PATH:-}:" in
         *":$INSTALL_DIR:"*)
             ok "$INSTALL_DIR est deja dans le PATH"
-            ;;
-        *)
-            local rc
-            case "${SHELL:-/bin/zsh}" in
-                *zsh)  rc="$HOME/.zshrc" ;;
-                *bash) rc="$HOME/.bash_profile" ;;
-                *)     rc="$HOME/.profile" ;;
-            esac
-            if ! grep -qs "$INSTALL_DIR" "$rc"; then
-                printf '\n# ajoute par epiclang-macos\nexport PATH="%s:$PATH"\n' "$INSTALL_DIR" >> "$rc"
-                ok "PATH complete dans $rc"
-            fi
-            info "Ouvre un nouveau terminal, ou lance : export PATH=\"$INSTALL_DIR:\$PATH\""
-            NEEDS_NEW_SHELL=1
+            info "aucun fichier de configuration n'a ete modifie"
+            return
             ;;
     esac
+
+    if [ "${EPICLANG_NO_RC:-0}" = "1" ]; then
+        info "EPICLANG_NO_RC=1 : aucun fichier de configuration modifie."
+        manual_path_hint
+        NEEDS_NEW_SHELL=1
+        return
+    fi
+
+    local rc
+    rc="$(pick_rc_file)"
+
+    # Ligne deja presente : on ne reecrit rien.
+    if [ -f "$rc" ] && grep -Fq "$PATH_LINE" "$rc"; then
+        ok "$rc contient deja la ligne, laisse intact"
+        NEEDS_NEW_SHELL=1
+        return
+    fi
+
+    if [ -L "$rc" ]; then
+        info "$rc est un lien symbolique vers $(readlink "$rc")"
+        info "(dotfiles geres : pense a reporter la ligne dans ton depot)"
+    fi
+
+    # Sauvegarde horodatee avant la moindre ecriture.
+    if [ -f "$rc" ]; then
+        local backup
+        backup="$rc.epiclang-backup-$(date +%Y%m%d-%H%M%S)"
+        cp -p "$rc" "$backup" || die "impossible de sauvegarder $rc, rien n'a ete modifie"
+        info "Sauvegarde : $backup"
+    fi
+
+    # Ajout en fin de fichier seulement, precede d'une ligne vide :
+    # rien de ce qui existe n'est modifie, deplace ni reordonne.
+    if printf '\n%s\n%s\n' "$PATH_MARKER" "$PATH_LINE" >> "$rc" 2>/dev/null; then
+        ok "deux lignes ajoutees a la fin de $rc"
+        info "Pour revenir en arriere : supprime ces deux lignes, ou restaure la sauvegarde."
+    else
+        info "Ecriture impossible dans $rc (fichier protege ?). Rien n'a ete modifie."
+        manual_path_hint
+    fi
+    NEEDS_NEW_SHELL=1
 }
 
 # --- 6. Verification ----------------------------------------------------

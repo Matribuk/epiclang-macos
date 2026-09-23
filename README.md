@@ -41,6 +41,30 @@ Termine. epiclang est pret.
 Si le script s'arrête en demandant d'accepter les conditions de Docker Desktop :
 ouvre l'application, accepte, puis relance `./install.sh`.
 
+### Ce que le script écrit sur ta machine
+
+Deux exécutables dans `~/.local/bin`, une image Docker, et rien d'autre — aucun
+`sudo`, sauf si Homebrew ou Docker doivent être installés.
+
+`~/.local/bin` doit être dans ton `PATH`. S'il y est déjà, **aucun fichier de
+configuration n'est ouvert**. Sinon le script ajoute deux lignes à la fin d'un
+seul fichier (`.zshrc`, ou `.bash_profile` en bash), après en avoir fait une
+copie horodatée :
+
+```sh
+# epiclang-macos
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Rien d'existant n'est modifié ni réordonné, et relancer le script n'ajoute pas
+la ligne une seconde fois. Pour t'en charger toi-même :
+
+```sh
+EPICLANG_NO_RC=1 ./install.sh
+```
+
+Autre emplacement d'installation : `EPICLANG_PREFIX=/un/autre/dossier ./install.sh`.
+
 ## Utilisation
 
 ### Un fichier propre
@@ -178,6 +202,9 @@ C'est aussi la plateforme sur laquelle tes projets seront corrigés.
 rm ~/.local/bin/epiclang ~/.local/bin/epibox
 docker image rm epiclang:local
 ```
+
+Si le script avait complété ton `PATH`, supprime aussi les deux lignes marquées
+`# epiclang-macos` à la fin de ton `.zshrc` ou `.bash_profile`.
 
 ## Mise à jour
 
