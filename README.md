@@ -48,13 +48,21 @@ Deux exécutables dans `~/.local/bin`, une image Docker, et rien d'autre — auc
 
 `~/.local/bin` doit être dans ton `PATH`. S'il y est déjà, **aucun fichier de
 configuration n'est ouvert**. Sinon le script ajoute deux lignes à la fin d'un
-seul fichier (`.zshrc`, ou `.bash_profile` en bash), après en avoir fait une
-copie horodatée :
+**seul** fichier, celui de ton shell, dans la syntaxe de ce shell, et après en
+avoir fait une copie horodatée :
 
-```sh
-# epiclang-macos
-export PATH="$HOME/.local/bin:$PATH"
-```
+| Shell | Fichier | Ligne ajoutée |
+| --- | --- | --- |
+| zsh | `~/.zshrc` | `export PATH="$HOME/.local/bin:$PATH"` |
+| bash | `~/.bash_profile`, sinon `~/.bashrc` | `export PATH="$HOME/.local/bin:$PATH"` |
+| fish | `~/.config/fish/config.fish` | `fish_add_path ~/.local/bin` |
+| tcsh | `~/.tcshrc`, sinon `~/.cshrc` | `setenv PATH "$HOME/.local/bin:$PATH"` |
+| csh | `~/.cshrc` | `setenv PATH "$HOME/.local/bin:$PATH"` |
+| ksh, dash, sh | `~/.profile` | `export PATH="$HOME/.local/bin:$PATH"` |
+| autre | aucun | le script affiche quoi ajouter, et ne touche à rien |
+
+En bash, un seul des deux fichiers est visé : `.bash_profile` source presque
+toujours `.bashrc`, écrire dans les deux doublerait la ligne.
 
 Rien d'existant n'est modifié ni réordonné, et relancer le script n'ajoute pas
 la ligne une seconde fois. Pour t'en charger toi-même :
@@ -204,7 +212,7 @@ docker image rm epiclang:local
 ```
 
 Si le script avait complété ton `PATH`, supprime aussi les deux lignes marquées
-`# epiclang-macos` à la fin de ton `.zshrc` ou `.bash_profile`.
+`# epiclang-macos` à la fin du fichier de configuration de ton shell.
 
 ## Mise à jour
 

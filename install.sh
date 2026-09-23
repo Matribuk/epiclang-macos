@@ -85,31 +85,55 @@ build_image() {
 
 # --- 5. Commandes -------------------------------------------------------
 
-# Choisit UN SEUL fichier de configuration, jamais deux : sur macOS un
-# .bash_profile source presque toujours .bashrc, ecrire dans les deux
-# dupliquerait la ligne.
-pick_rc_file() {
-    case "${SHELL:-/bin/zsh}" in
-        *zsh)
-            printf '%s\n' "$HOME/.zshrc"
+# Chaque shell a son fichier ET sa syntaxe : une ligne "export PATH=..."
+# ecrite dans une configuration fish ou tcsh casserait le shell au demarrage.
+# RC_FILE vide = shell inconnu, on n'ecrit nulle part.
+detect_shell_config() {
+    SHELL_NAME="$(basename "${SHELL:-inconnu}")"
+    RC_FILE=""
+    PATH_LINE="export PATH=\"$INSTALL_DIR:\$PATH\""
+
+    case "$SHELL_NAME" in
+        zsh)
+            RC_FILE="$HOME/.zshrc"
             ;;
-        *bash)
+        bash)
+            # Un seul des deux : sur macOS .bash_profile source presque
+            # toujours .bashrc, ecrire dans les deux doublerait la ligne.
             if [ -f "$HOME/.bash_profile" ]; then
-                printf '%s\n' "$HOME/.bash_profile"
+                RC_FILE="$HOME/.bash_profile"
             elif [ -f "$HOME/.bashrc" ]; then
-                printf '%s\n' "$HOME/.bashrc"
+                RC_FILE="$HOME/.bashrc"
             else
-                printf '%s\n' "$HOME/.bash_profile"
+                RC_FILE="$HOME/.bash_profile"
             fi
             ;;
-        *)
-            printf '%s\n' "$HOME/.profile"
+        sh|dash|ksh|mksh)
+            RC_FILE="$HOME/.profile"
+            ;;
+        fish)
+            RC_FILE="$HOME/.config/fish/config.fish"
+            PATH_LINE="fish_add_path $INSTALL_DIR"
+            ;;
+        tcsh)
+            if [ -f "$HOME/.tcshrc" ]; then
+                RC_FILE="$HOME/.tcshrc"
+            elif [ -f "$HOME/.cshrc" ]; then
+                RC_FILE="$HOME/.cshrc"
+            else
+                RC_FILE="$HOME/.tcshrc"
+            fi
+            PATH_LINE="setenv PATH \"$INSTALL_DIR:\$PATH\""
+            ;;
+        csh)
+            RC_FILE="$HOME/.cshrc"
+            PATH_LINE="setenv PATH \"$INSTALL_DIR:\$PATH\""
             ;;
     esac
 }
 
 manual_path_hint() {
-    info "Ajoute toi-meme cette ligne a ton fichier de configuration :"
+    info "Ajoute toi-meme cette ligne a la configuration de ton shell :"
     info "    $PATH_LINE"
 }
 
@@ -120,8 +144,7 @@ install_commands() {
     install -m 0755 "$REPO_DIR/bin/epibox"   "$INSTALL_DIR/epibox"
     ok "installees dans $INSTALL_DIR"
 
-    PATH_MARKER="# epiclang-macos"
-    PATH_LINE="export PATH=\"$INSTALL_DIR:\$PATH\""
+    detect_shell_config
 
     # Cas le plus frequent : rien a faire, aucun fichier n'est ouvert.
     case ":${PATH:-}:" in
@@ -132,46 +155,54 @@ install_commands() {
             ;;
     esac
 
+    NEEDS_NEW_SHELL=1
+
     if [ "${EPICLANG_NO_RC:-0}" = "1" ]; then
         info "EPICLANG_NO_RC=1 : aucun fichier de configuration modifie."
         manual_path_hint
-        NEEDS_NEW_SHELL=1
         return
     fi
 
-    local rc
-    rc="$(pick_rc_file)"
+    if [ -z "$RC_FILE" ]; then
+        info "Shell non reconnu ($SHELL_NAME) : aucun fichier modifie, par prudence."
+        info "Ajoute $INSTALL_DIR au debut de ton PATH,"
+        info "avec la syntaxe propre a $SHELL_NAME."
+        return
+    fi
+
+    ok "shell detecte : $SHELL_NAME"
 
     # Ligne deja presente : on ne reecrit rien.
-    if [ -f "$rc" ] && grep -Fq "$PATH_LINE" "$rc"; then
-        ok "$rc contient deja la ligne, laisse intact"
-        NEEDS_NEW_SHELL=1
+    if [ -f "$RC_FILE" ] && grep -Fq "$PATH_LINE" "$RC_FILE"; then
+        ok "$RC_FILE contient deja la ligne, laisse intact"
         return
     fi
 
-    if [ -L "$rc" ]; then
-        info "$rc est un lien symbolique vers $(readlink "$rc")"
+    if [ -L "$RC_FILE" ]; then
+        info "$RC_FILE est un lien symbolique vers $(readlink "$RC_FILE")"
         info "(dotfiles geres : pense a reporter la ligne dans ton depot)"
     fi
 
+    mkdir -p "$(dirname "$RC_FILE")"
+
     # Sauvegarde horodatee avant la moindre ecriture.
-    if [ -f "$rc" ]; then
+    if [ -f "$RC_FILE" ]; then
         local backup
-        backup="$rc.epiclang-backup-$(date +%Y%m%d-%H%M%S)"
-        cp -p "$rc" "$backup" || die "impossible de sauvegarder $rc, rien n'a ete modifie"
+        backup="$RC_FILE.epiclang-backup-$(date +%Y%m%d-%H%M%S)"
+        cp -p "$RC_FILE" "$backup" || die "impossible de sauvegarder $RC_FILE, rien n'a ete modifie"
         info "Sauvegarde : $backup"
     fi
 
     # Ajout en fin de fichier seulement, precede d'une ligne vide :
     # rien de ce qui existe n'est modifie, deplace ni reordonne.
-    if printf '\n%s\n%s\n' "$PATH_MARKER" "$PATH_LINE" >> "$rc" 2>/dev/null; then
-        ok "deux lignes ajoutees a la fin de $rc"
+    if printf '\n# epiclang-macos\n%s\n' "$PATH_LINE" >> "$RC_FILE" 2>/dev/null; then
+        ok "deux lignes ajoutees a la fin de $RC_FILE"
+        info "    $PATH_LINE"
         info "Pour revenir en arriere : supprime ces deux lignes, ou restaure la sauvegarde."
     else
-        info "Ecriture impossible dans $rc (fichier protege ?). Rien n'a ete modifie."
+        info "Ecriture impossible dans $RC_FILE (fichier protege ?). Rien n'a ete modifie."
         manual_path_hint
     fi
-    NEEDS_NEW_SHELL=1
 }
 
 # --- 6. Verification ----------------------------------------------------
